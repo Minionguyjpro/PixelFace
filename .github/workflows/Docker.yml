@@ -33,13 +33,18 @@ jobs:
               username: ${{ secrets.DOCKERHUB_USERNAME }}
               password: ${{ secrets.DOCKERHUB_TOKEN }}
 
+          - name: Set image repository variables
+            run: |
+              echo "GHCR_IMAGE=ghcr.io/$(echo $GITHUB_REPOSITORY | tr '[:upper:]' '[:lower:]')" >> $GITHUB_ENV
+              echo "DOCKERHUB_IMAGE=${{ secrets.DOCKERHUB_USERNAME }}/pixelface" >> $GITHUB_ENV
+
           - name: Extract metadata (tags, labels) for Docker
             id: meta
             uses: docker/metadata-action@v5
             with:
               images: |
-                ghcr.io/${{ github.repository }}
-                ${{ secrets.DOCKERHUB_USERNAME }}/pixelface
+                 ${{ env.GHCR_IMAGE }}
+                 ${{ env.DOCKERHUB_IMAGE }}
 
           - name: Build and push Docker image
             uses: docker/build-push-action@v5
@@ -47,6 +52,6 @@ jobs:
               context: .
               push: true
               tags: |
-                ghcr.io/${{ github.repository }}:latest
-                ${{ secrets.DOCKERHUB_USERNAME }}/pixelface:latest
+                ${{ env.GHCR_IMAGE }}:latest
+                ${{ env.DOCKERHUB_IMAGE }}:latest
               labels: ${{ steps.meta.outputs.labels }}
