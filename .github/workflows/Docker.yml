@@ -65,6 +65,6 @@ jobs:
             uses: ms-jpq/sync-dockerhub-readme@v1
             with:
               username: ${{ secrets.DOCKERHUB_USERNAME }}
-              password: ${{ secrets.DOCKERHUB_TOKEN }}
+              password: ${{ secrets.DOCKERHUB_PASSWORD }}
               repository: minionguyjpro/pixelface
               readme: "./README.md"
