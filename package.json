@@ -1,0 +1,35 @@
+{
+  "name": "pixelface",
+  "version": "1.0.0",
+  "description": "A Minecraft vanilla entity faces API written in Node.js. ",
+  "main": "src/server.js",
+  "directories": {
+    "doc": "docs"
+  },
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Minionguyjpro/PixelHead.git"
+  },
+  "keywords": [
+    "minecraft",
+    "vanilla",
+    "face",
+    "api",
+    "http",
+    "nodejs"
+  ],
+  "author": "Minionguyjpro",
+  "license": "GPL-3.0",
+  "bugs": {
+    "url": "https://github.com/Minionguyjpro/PixelFace/issues"
+  },
+  "homepage": "https://github.com/Minionguyjpro/PixelFace#readme",
+  "dependencies": {
+    "axios": "^1.9.0",
+    "express": "^5.1.0",
+    "sharp": "^0.34.2"
+  }
+}

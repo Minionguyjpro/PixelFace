@@ -1,2 +1,2 @@
 # PixelHead
-A Minecraft vanilla entity heads API written in Node.js.
+A Minecraft vanilla entity face API written in Node.js.
