@@ -1,3 +1,4 @@
 {
-    "wolf": "extractWolfFaceWithSnout"  
+    "cat*": "extractCatFaceWithSnout",
+    "wolf*": "extractWolfFaceWithSnout"  
 }

@@ -17,33 +17,87 @@ async function getImageDimensions(buffer) {
   return { width: metadata.width, height: metadata.height };
 }
 
+async function extractCatFaceWithSnout(buffer, outWidth) {
+  // Face and snout regions (adjust if needed)
+  const faceRegion = { left: 5, top: 5, width: 5, height: 4 };
+  const snoutRegion = { left: 2, top: 26, width: 3, height: 2 };
+
+  // Calculate output height to preserve aspect ratio
+  const aspect = faceRegion.height / faceRegion.width;
+  const outHeight = Math.round(outWidth * aspect);
+
+  // Calculate scale factors for X and Y
+  const scaleX = outWidth / faceRegion.width;
+  const scaleY = outHeight / faceRegion.height;
+
+  // Extract and scale face
+  const face = await sharp(buffer)
+    .extract(faceRegion)
+    .resize(outWidth, outHeight, { kernel: "nearest" })
+    .png()
+    .toBuffer();
+
+  // Extract and scale snout
+  const snout = await sharp(buffer)
+    .extract(snoutRegion)
+    .resize(
+      Math.round(snoutRegion.width * scaleX),
+      Math.round(snoutRegion.height * scaleY),
+      { kernel: "nearest" }
+    )
+    .png()
+    .toBuffer();
+
+  // Center snout horizontally, place at bottom of face, then move down by 0.5
+  const snoutLeft = Math.round((faceRegion.width / 2 - snoutRegion.width / 2) * scaleX);
+  const snoutTop = Math.round((faceRegion.height - snoutRegion.height) * scaleY); // or + 0.25 if needed
+  // Composite snout onto face
+  const composed = await sharp(face)
+    .composite([
+      { input: snout, left: snoutLeft, top: snoutTop }
+    ])
+    .png()
+    .toBuffer();
+
+  return composed;
+}
+
 async function extractWolfFaceWithSnout(buffer, outWidth) {
-  // 1. Define regions
+  // Define regions
   const faceRegion = { left: 4, top: 4, width: 6, height: 6 };
   const snoutRegion = { left: 4, top: 14, width: 3, height: 3 };
 
-  // 2. Calculate scale factor
-  const scale = outWidth / faceRegion.width;
+  // Calculate output height to preserve aspect ratio (if you want to keep it square, use outWidth for both)
+  const aspect = faceRegion.height / faceRegion.width;
+  const outHeight = Math.round(outWidth * aspect);
 
-  // 3. Extract and scale face
+  // Calculate scale factors for X and Y
+  const scaleX = outWidth / faceRegion.width;
+  const scaleY = outHeight / faceRegion.height;
+
+  // Extract and scale face
   const face = await sharp(buffer)
     .extract(faceRegion)
-    .resize(outWidth, outWidth, { kernel: "nearest" })
+    .resize(outWidth, outHeight, { kernel: "nearest" })
     .png()
     .toBuffer();
 
-  // 4. Extract and scale snout
+  // Extract and scale snout
   const snout = await sharp(buffer)
     .extract(snoutRegion)
-    .resize(Math.round(snoutRegion.width * scale), Math.round(snoutRegion.height * scale), { kernel: "nearest" })
+    .resize(
+      Math.round(snoutRegion.width * scaleX),
+      Math.round(snoutRegion.height * scaleY),
+      { kernel: "nearest" }
+    )
     .png()
     .toBuffer();
 
-  // 5. Calculate snout position on scaled face
-  const snoutLeft = Math.round(1.5 * scale); // (face width - snout width) / 2 = (6-3)/2 = 1.5, use 1 for center
-  const snoutTop = Math.round(3 * scale);  // Place at bottom half: 6-3=3
+  // Center snout horizontally, place at bottom of face
+  const snoutLeft = Math.round((faceRegion.width / 2 - snoutRegion.width / 2) * scaleX);
+  const snoutTop = Math.round((faceRegion.height - snoutRegion.height) * scaleY);
 
-  // 6. Composite snout onto face
+  // Composite snout onto face
   const composed = await sharp(face)
     .composite([
       { input: snout, left: snoutLeft, top: snoutTop }
@@ -57,5 +111,6 @@ async function extractWolfFaceWithSnout(buffer, outWidth) {
 module.exports = {
   extractFaceFromBuffer,
   getImageDimensions,
+  extractCatFaceWithSnout,
   extractWolfFaceWithSnout,
 };

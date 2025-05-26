@@ -1,27 +1,82 @@
 const express = require("express");
 const router = express.Router();
 const faceRegions = require("../overrides/faceRegions.json");
+const assetMappings = require("../overrides/assetMappings.json");
+const specialFaces = require("../overrides/specialFaces.json");
 const { fetchImageFromUrl } = require("../utils/fetchImage");
-const { extractFaceFromBuffer, getImageDimensions } = require("../services/imageService");
+const imageService = require("../services/imageService");
+const { extractFaceFromBuffer, getImageDimensions } = imageService;
+
+// Wildcard matching helper (supports *anywhere*)
+function wildcardMatch(pattern, name) {
+  if (!pattern.includes("*")) return pattern === name;
+  // Escape regex special chars except *
+  const regex = new RegExp("^" + pattern.split("*").map(s => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join(".*") + "$");
+  return regex.test(name);
+}
+
+// Helper for asset mapping with wildcard support
+function getAssetPath(name, assetMappings) {
+  if (assetMappings[name]) return assetMappings[name];
+  for (const key of Object.keys(assetMappings)) {
+    if (wildcardMatch(key, name)) {
+      return assetMappings[key].replace("{name}", name);
+    }
+  }
+  return `${name}/${name}`;
+}
+
+// Helper for face region with wildcard support
+function getFaceRegion(name, faceRegions, assetPath) {
+  // 1. Exact match by name
+  if (faceRegions[name]) return faceRegions[name];
+
+  // 2. Asset path match (with ^ prefix and wildcard support)
+  for (const key of Object.keys(faceRegions)) {
+    if (key.startsWith("^")) {
+      const pattern = key.slice(1);
+      if (wildcardMatch(pattern, assetPath)) {
+        return faceRegions[key];
+      }
+    }
+  }
+
+    // 3. Wildcard match by name
+  for (const key of Object.keys(faceRegions)) {
+    if (wildcardMatch(key, name)) {
+      return faceRegions[key];
+    }
+  }
+
+  return null;
+}
+
+// Helper for special face handlers with wildcard support
+function getSpecialFaceHandler(name, specialFaces) {
+  if (specialFaces[name]) return specialFaces[name];
+  for (const key of Object.keys(specialFaces)) {
+    if (wildcardMatch(key, name)) {
+      return specialFaces[key];
+    }
+  }
+  return null;
+}
 
 // Endpoint to get a mob face texture
-// Example usage: GET /faces/zombie
-// - `name`: The name of the mob (e.g., "zombie", "skeleton")
 router.get("/:name", async (req, res) => {
   const name = req.params.name.toLowerCase();
   const outWidth = parseInt(req.query.width || "64");
 
-  // Put URLs to try for fetching the mob texture
+  // Get asset path with wildcard support
+  const assetPath = getAssetPath(name, assetMappings);
+
+  // URLs to try for fetching the mob texture
   const urlsToTry = [
-    `https://assets.mcasset.cloud/latest/assets/minecraft/textures/entity/${name}/${name}.png`,
+    `https://assets.mcasset.cloud/latest/assets/minecraft/textures/entity/${assetPath}.png`,
     `https://assets.mcasset.cloud/latest/assets/minecraft/textures/entity/${name}.png`,
   ];
 
   let imageBuffer = null;
-
-  // Try fetching the image from the provided URLs
-  // If one fails, it will try the next one
-  // If all fail, it will return a 404 error
   for (const url of urlsToTry) {
     try {
       imageBuffer = await fetchImageFromUrl(url);
@@ -34,7 +89,7 @@ router.get("/:name", async (req, res) => {
     }
   }
 
-  // If no image was fetched, return a 404 error
+  // If no image was found, return a 404 error
   if (!imageBuffer) {
     return res.status(404).send("Texture not found for that mob.");
   }
@@ -50,8 +105,8 @@ router.get("/:name", async (req, res) => {
     return res.status(500).send("Failed to process image.");
   }
 
-  // Determine region
-  let region = faceRegions[name];
+  // Get face region with wildcard support
+  let region = getFaceRegion(name, faceRegions, assetPath);
   if (!region) {
     if (width === 64 && height === 64) {
       region = { x: 8, y: 8, width: 8, height: 8 };
@@ -62,13 +117,11 @@ router.get("/:name", async (req, res) => {
     }
   }
 
-const specialFaces = require("../overrides/specialFaces.json");
-const imageService = require("../services/imageService");
-
-  // Special handling for certain faces
-  if (specialFaces[name]) {
+  // Special handling for certain faces (with wildcard support)
+  const specialHandler = getSpecialFaceHandler(name, specialFaces);
+  if (specialHandler) {
     try {
-      const fn = imageService[specialFaces[name]];
+      const fn = imageService[specialHandler];
       if (typeof fn === "function") {
         const cropped = await fn(imageBuffer, outWidth);
         res.set("Content-Type", "image/png");
@@ -80,7 +133,7 @@ const imageService = require("../services/imageService");
     }
   }
 
-  // Crop the face region from the image buffer
+  // Generic face extraction
   try {
     const cropped = await extractFaceFromBuffer(imageBuffer, outWidth, region);
     res.set("Content-Type", "image/png");
