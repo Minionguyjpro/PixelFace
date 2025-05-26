@@ -14,7 +14,7 @@ https://pixelface.dedyn.io/faces/[nameofentity]
 
 For example, to download the image of a zombie using cURL, use:
 
-```
+```bash
 $ curl -o zombie.png https://pixelface.dedyn.io/faces/zombie
 ```
 # Self Hosting
@@ -22,7 +22,7 @@ PixelFace can easily be hosted by yourself. You can either do this by manually i
 ## Docker
 Using the Docker image, you can get the API quickly up and running.
 ### Docker Command
-```
+```bash
 $ docker run -d -p 3000:3000 --name pixelface minionguyjpro/pixelface:latest
 ```
 ### Docker Compose
@@ -39,7 +39,7 @@ services:
 # Contributing
 Contributions to this project are more than welcome! Any new features or improvements to come would be great. To contribute to this project, first clone the repository and go into the working directory:
 
-```
+```bash
 # Clone the repository locally
 $ git clone https://github.com/Minionguyjpro/PixelFace
 # Change into the working directory
@@ -48,7 +48,7 @@ $ cd PixelFace
 
 Now make your changes to your fork of the repository. Finally, commit and push the changes:
 
-```
+```bash
 # Track all changes and files
 $ git add -A
 # Commit the changes
