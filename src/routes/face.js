@@ -1,11 +1,9 @@
 const express = require("express");
 const router = express.Router();
-const faceRegions = require("../overrides/faceRegions.json");
-const assetMappings = require("../overrides/assetMappings.json");
-const specialFaces = require("../overrides/specialFaces.json");
+const { getOverrides } = require("../services/reloadService");
 const { fetchImageFromUrl } = require("../utils/fetchImage");
 const imageService = require("../services/imageService");
-const { extractFaceFromBuffer, getImageDimensions } = imageService;
+const { extractFaceFromBuffer, extractFaceWithSnout, getImageDimensions } = imageService;
 
 // Wildcard matching helper (supports *anywhere*)
 function wildcardMatch(pattern, name) {
@@ -17,7 +15,7 @@ function wildcardMatch(pattern, name) {
 
 // Helper for asset mapping with wildcard support
 function getAssetPath(name, assetMappings) {
-  if (assetMappings[name]) return assetMappings[name];
+  if (assetMappings[name]) return assetMappings[name].replace("{name}", name);
   for (const key of Object.keys(assetMappings)) {
     if (wildcardMatch(key, name)) {
       return assetMappings[key].replace("{name}", name);
@@ -28,10 +26,7 @@ function getAssetPath(name, assetMappings) {
 
 // Helper for face region with wildcard support
 function getFaceRegion(name, faceRegions, assetPath) {
-  // 1. Exact match by name
   if (faceRegions[name]) return faceRegions[name];
-
-  // 2. Asset path match (with ^ prefix and wildcard support)
   for (const key of Object.keys(faceRegions)) {
     if (key.startsWith("^")) {
       const pattern = key.slice(1);
@@ -40,23 +35,28 @@ function getFaceRegion(name, faceRegions, assetPath) {
       }
     }
   }
-
-    // 3. Wildcard match by name
   for (const key of Object.keys(faceRegions)) {
     if (wildcardMatch(key, name)) {
       return faceRegions[key];
     }
   }
-
   return null;
 }
 
-// Helper for special face handlers with wildcard support
-function getSpecialFaceHandler(name, specialFaces) {
-  if (specialFaces[name]) return specialFaces[name];
-  for (const key of Object.keys(specialFaces)) {
+// Helper for snout region with wildcard and asset path support
+function getSnoutRegion(name, snoutRegions, assetPath) {
+  if (snoutRegions[name]) return snoutRegions[name];
+  for (const key of Object.keys(snoutRegions)) {
+    if (key.startsWith("^")) {
+      const pattern = key.slice(1);
+      if (wildcardMatch(pattern, assetPath)) {
+        return snoutRegions[key];
+      }
+    }
+  }
+  for (const key of Object.keys(snoutRegions)) {
     if (wildcardMatch(key, name)) {
-      return specialFaces[key];
+      return snoutRegions[key];
     }
   }
   return null;
@@ -67,7 +67,8 @@ router.get("/:name", async (req, res) => {
   const name = req.params.name.toLowerCase();
   const outWidth = parseInt(req.query.width || "64");
 
-  // Get asset path with wildcard support
+  // Get asset path and regions with wildcard support
+  const { faceRegions, assetMappings, snoutRegions } = getOverrides();
   const assetPath = getAssetPath(name, assetMappings);
 
   // URLs to try for fetching the mob texture
@@ -110,6 +111,8 @@ router.get("/:name", async (req, res) => {
   if (!region) {
     if (width === 64 && height === 64) {
       region = { x: 8, y: 8, width: 8, height: 8 };
+    } else if (width === 128 && height === 64) {
+      region = { x: 7, y: 7, width: 7, height: 7 };
     } else if (width === 32 && height === 32) {
       region = { x: 5, y: 5, width: 5, height: 5 };
     } else {
@@ -117,19 +120,16 @@ router.get("/:name", async (req, res) => {
     }
   }
 
-  // Special handling for certain faces (with wildcard support)
-  const specialHandler = getSpecialFaceHandler(name, specialFaces);
-  if (specialHandler) {
+  // General snout logic: if a snout region exists, use it
+  const snoutRegion = getSnoutRegion(name, snoutRegions, assetPath);
+  if (snoutRegion) {
     try {
-      const fn = imageService[specialHandler];
-      if (typeof fn === "function") {
-        const cropped = await fn(imageBuffer, outWidth);
-        res.set("Content-Type", "image/png");
-        return res.send(cropped);
-      }
+      const cropped = await extractFaceWithSnout(imageBuffer, outWidth, region, snoutRegion);
+      res.set("Content-Type", "image/png");
+      return res.send(cropped);
     } catch (err) {
-      console.error(`${name} face processing error:`, err.message);
-      return res.status(500).send(`Failed to process ${name} face.`);
+      console.error(`${name} face+snout processing error:`, err.message);
+      return res.status(500).send(`Failed to process ${name} face+snout.`);
     }
   }
 

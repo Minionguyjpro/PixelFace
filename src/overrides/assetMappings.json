@@ -1,4 +1,5 @@
 {
+    "axolotl*": "axolotl/{name}",
     "cat*": "cat/{name}",
     "cat_all_black": "cat/all_black",
     "cat_black": "cat/black",
@@ -12,6 +13,7 @@
     "cat_siamese": "cat/siamese",
     "cat_tabby": "cat/tabby",
     "cat_white": "cat/white",
+    "polarbear": "bear/{name}",
     "*squid": "squid/{name}",
     "wolf*": "wolf/{name}"
 }

@@ -1,4 +1,16 @@
 {
+  "axolotl*": {
+    "x": 5,
+    "y": 6,
+    "width": 8,
+    "height": 5
+  },
+  "camel": {
+    "x": 28,
+    "y": 7,
+    "width": 7,
+    "height": 5
+  },
   "^cat/*": {
     "x": 5,
     "y": 5,
