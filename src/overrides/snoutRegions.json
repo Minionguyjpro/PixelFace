@@ -17,6 +17,12 @@
     "width": 5,
     "height": 3
   },
+  "villager": {
+    "x": 24,
+    "y": 2,
+    "width": 2,
+    "height": 4
+  },
   "wolf*": {
      "x": 4,
      "y": 14,
