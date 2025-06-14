@@ -189,11 +189,42 @@ router.get("/:name", async (req, res) => {
   }
 
   // General snout logic: if a snout region exists, use it
-  const snoutRegion = getSnoutRegion(name, snoutRegions, assetPath);
-  if (snoutRegion) {
+  const snoutRegionEntry = getSnoutRegion(name, snoutRegions, assetPath);
+  if (snoutRegionEntry) {
     if (outWidth % region.width !== 0) {
       outWidth = getClosestValidWidth(outWidth, region.width);
     }
+
+    // Support all valid snout region formats and apply offset if present
+    let snoutRegion, snoutOffset;
+    if (Array.isArray(snoutRegionEntry.region)) {
+      // New format with offset
+      const [x, y, width, height] = snoutRegionEntry.region;
+      snoutRegion = { x, y, width, height };
+      snoutOffset = snoutRegionEntry.offset || { x: 0, y: 0 };
+    } else if (snoutRegionEntry.region && typeof snoutRegionEntry.region === "object") {
+      snoutRegion = snoutRegionEntry.region;
+      snoutOffset = snoutRegionEntry.offset || { x: 0, y: 0 };
+    } else if (Array.isArray(snoutRegionEntry)) {
+      // Old format as array only
+      const [x, y, width, height] = snoutRegionEntry;
+      snoutRegion = { x, y, width, height };
+      snoutOffset = { x: 0, y: 0 };
+    } else if (typeof snoutRegionEntry === "object" && "x" in snoutRegionEntry && "y" in snoutRegionEntry) {
+      // Old format as object
+      snoutRegion = snoutRegionEntry;
+      snoutOffset = { x: 0, y: 0 };
+    } else {
+      return res.status(500).send("Invalid snout region definition.");
+    }
+
+    // Apply the offset to the snout region
+    snoutRegion = {
+      ...snoutRegion,
+      x: snoutRegion.x + (snoutOffset.x || 0),
+      y: snoutRegion.y + (snoutOffset.y || 0)
+    };
+
     try {
       const cropped = await extractFaceWithSnout(imageBuffer, outWidth, region, snoutRegion);
       res.set("Content-Type", "image/png");
