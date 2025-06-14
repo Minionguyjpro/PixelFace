@@ -35,6 +35,12 @@
     "width": 12,
     "height": 16
   },
+  "villager": {
+    "x": 8,
+    "y": 8,
+    "width": 8,
+    "height": 10
+  },
   "witch": {
     "x": 8,
     "y": 8,
