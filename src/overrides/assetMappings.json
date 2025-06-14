@@ -13,6 +13,7 @@
     "cat_siamese": "cat/siamese",
     "cat_tabby": "cat/tabby",
     "cat_white": "cat/white",
+    "end_crystal": null,
     "polarbear": "bear/{name}",
     "*squid": "squid/{name}",
     "wolf*": "wolf/{name}"

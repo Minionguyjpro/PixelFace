@@ -3,7 +3,7 @@ const router = express.Router();
 const { getOverrides } = require("../services/reloadService");
 const { fetchImageFromUrl } = require("../utils/fetchImage");
 const imageService = require("../services/imageService");
-const { extractFaceFromBuffer, extractFaceWithSnout, getImageDimensions } = imageService;
+const { extractFaceFromBuffer, extractFaceWithSnout, extractFaceWithBackground, getImageDimensions } = imageService;
 
 // Wildcard matching helper (supports *anywhere*)
 function wildcardMatch(pattern, name) {
@@ -15,13 +15,23 @@ function wildcardMatch(pattern, name) {
 
 // Helper for asset mapping with wildcard support
 function getAssetPath(name, assetMappings) {
-  if (assetMappings[name]) return assetMappings[name].replace("{name}", name);
+  if (Object.prototype.hasOwnProperty.call(assetMappings, name)) {
+    return assetMappings[name];
+  }
   for (const key of Object.keys(assetMappings)) {
     if (wildcardMatch(key, name)) {
-      return assetMappings[key].replace("{name}", name);
+      return assetMappings[key];
     }
   }
   return `${name}/${name}`;
+}
+
+// Helper to get the closest valid width for face extraction
+function getClosestValidWidth(target, faceWidth) {
+  const lower = Math.floor(target / faceWidth) * faceWidth;
+  const upper = Math.ceil(target / faceWidth) * faceWidth;
+  // Pick the closest one to target
+  return (target - lower <= upper - target) ? lower : upper;
 }
 
 // Helper for face region with wildcard support
@@ -62,14 +72,38 @@ function getSnoutRegion(name, snoutRegions, assetPath) {
   return null;
 }
 
+// Helper for background region with wildcard and asset path support
+function getBackgroundRegion(name, backgroundRegions, assetPath) {
+  if (backgroundRegions && backgroundRegions[name]) return backgroundRegions[name];
+  if (!backgroundRegions) return null;
+  for (const key of Object.keys(backgroundRegions)) {
+    if (key.startsWith("^")) {
+      const pattern = key.slice(1);
+      if (wildcardMatch(pattern, assetPath)) {
+        return backgroundRegions[key];
+      }
+    }
+  }
+  for (const key of Object.keys(backgroundRegions)) {
+    if (wildcardMatch(key, name)) {
+      return backgroundRegions[key];
+    }
+  }
+  return null;
+}
+
 // Endpoint to get a mob face texture
 router.get("/:name", async (req, res) => {
   const name = req.params.name.toLowerCase();
-  const outWidth = parseInt(req.query.width || "64");
 
   // Get asset path and regions with wildcard support
-  const { faceRegions, assetMappings, snoutRegions } = getOverrides();
+  const { faceRegions, assetMappings, snoutRegions, backgroundRegions } = getOverrides();
   const assetPath = getAssetPath(name, assetMappings);
+
+  // If the asset mapping is explicitly null, return 404
+  if (assetPath === null) {
+    return res.status(404).send("Texture not found for that mob.");
+  }
 
   // URLs to try for fetching the mob texture
   const urlsToTry = [
@@ -120,12 +154,52 @@ router.get("/:name", async (req, res) => {
     }
   }
 
+  // Determine output width
+  let outWidth = req.query.width ? parseInt(req.query.width, 10) : 64;
+
+  // Check for background region (for slimes, etc.)
+  const backgroundRegion = getBackgroundRegion(name, backgroundRegions, assetPath);
+  if (backgroundRegion) {
+    // Validate all regions
+    const regions = Array.isArray(backgroundRegion) ? backgroundRegion : [backgroundRegion];
+    for (const r of regions) {
+      if (
+        typeof r.x !== "number" ||
+        typeof r.y !== "number" ||
+        typeof r.width !== "number" ||
+        typeof r.height !== "number"
+      ) {
+        return res.status(500).send("Invalid background region definition.");
+      }
+    }
+    if (outWidth % region.width !== 0) {
+      outWidth = getClosestValidWidth(outWidth, region.width);
+    }
+    try {
+      const cropped = await extractFaceWithBackground(imageBuffer, outWidth, region, backgroundRegion);
+      res.set("Content-Type", "image/png");
+      if (req.query.width && parseInt(req.query.width, 10) !== outWidth) {
+        res.set("X-Actual-Width", outWidth.toString());
+      }
+      return res.send(cropped);
+    } catch (err) {
+      console.error(`${name} face+background processing error:`, err.message);
+      return res.status(500).send(`Failed to process ${name} face+background.`);
+    }
+  }
+
   // General snout logic: if a snout region exists, use it
   const snoutRegion = getSnoutRegion(name, snoutRegions, assetPath);
   if (snoutRegion) {
+    if (outWidth % region.width !== 0) {
+      outWidth = getClosestValidWidth(outWidth, region.width);
+    }
     try {
       const cropped = await extractFaceWithSnout(imageBuffer, outWidth, region, snoutRegion);
       res.set("Content-Type", "image/png");
+      if (req.query.width && parseInt(req.query.width, 10) !== outWidth) {
+        res.set("X-Actual-Width", outWidth.toString());
+      }
       return res.send(cropped);
     } catch (err) {
       console.error(`${name} face+snout processing error:`, err.message);
