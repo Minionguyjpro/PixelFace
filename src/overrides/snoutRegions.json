@@ -18,7 +18,7 @@
     "height": 3
   },
   "villager": {
-    "region": [24, 2, 2, 4],
+    "region": [26, 2, 2, 4],
     "offset": { "x": 0, "y": -1 }
   },
   "wolf*": {
